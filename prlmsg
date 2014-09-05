@@ -1,0 +1,238 @@
+#!/usr/bin/env python
+
+import re
+import sys
+import time
+import prlsdkapi
+
+##
+##
+##
+def main():
+    if len(sys.argv) != 3:
+       print "Send a message to a Parallels VM console."
+       print ""
+       print "This emulates typing a message on the keyboard, which is especially useful for typing"
+       print "boot commands during unattended ISO installs."
+       print ""
+       print "Usage  : prlmsg VM_NAME MESSAGE"
+       print "Example: prlmsg 'CentOS VM' '<tab> text ks=http://localhost:1234/ks.cfg<enter><wait10>'"
+       sys.exit(1)
+
+    vm_name = sys.argv[1]
+    message = sys.argv[2]
+
+    server = login()
+    vm, vm_io = connect(server, vm_name)
+
+    send(message, vm, vm_io)
+
+    disconnect(server, vm, vm_io)
+
+
+##
+##
+##
+def login():
+    prlsdkapi.prlsdk.InitializeSDK(prlsdkapi.prlsdk.consts.PAM_DESKTOP_MAC)
+    server = prlsdkapi.Server()
+    login_job=server.login_local()
+    login_job.wait()
+
+    return server
+
+
+##
+##
+##
+def connect(server, vm_name):
+    vm_list_job = server.get_vm_list()
+    result = vm_list_job.wait()
+
+    vm_list = [result.get_param_by_index(i) for i in range(result.get_params_count())]
+    vm = [vm for vm in vm_list if vm.get_name() == vm_name]
+
+    if not vm:
+       vm_names = [vm.get_name() for vm in vm_list]
+       raise Exception("%s: No such VM. Available VM's are:\n%s" % (vm_name, "\n".join(vm_names)))
+
+    vm = vm[0]
+
+    vm_io = prlsdkapi.VmIO()
+    vm_io.connect_to_vm(vm).wait()
+
+    return (vm, vm_io)
+
+
+##
+##
+##
+def disconnect(server, vm, vm_io):
+    if vm and vm_io:
+        vm_io.disconnect_from_vm(vm)
+
+    if server:
+        server.logoff()
+
+    prlsdkapi.deinit_sdk
+
+
+##
+##
+##
+def send(message, vm, vm_io):
+
+    consts = prlsdkapi.prlsdk.consts
+    press = consts.PKE_PRESS
+    release = consts.PKE_RELEASE
+    timeout = 1
+
+    charKeyMap = getCharKeyMap()
+    ctrlKeyMap = getCtrlKeyMap()
+
+    while len(message):
+        code = None
+
+        m = re.match('<wait(\d+)?>', message)
+        if (m):
+            wait = m.group(1)
+            if not wait:
+                wait = 1
+            message = message[len(m.group(0)):]
+            time.sleep(float(wait))
+            continue
+
+        for key in ctrlKeyMap:
+            if message.startswith(key):
+                code = ctrlKeyMap[key]
+                message = message[len(key):]
+                break
+
+        if not code:
+            key = message[0]
+            if key in charKeyMap:
+                code = charKeyMap[key]
+                message = message[1:]
+
+        if not code:
+            raise Exception("Unsupported next character in string: " + message)
+
+        c = code['code']
+        modifier = 'modifier' in code and code['modifier']
+
+        if modifier:
+            vm_io.send_key_event(vm, modifier, press, timeout)
+        vm_io.send_key_event(vm, c, press, timeout)
+        vm_io.send_key_event(vm, c, release, timeout)
+        if modifier:
+            vm_io.send_key_event(vm, modifier, release, timeout)
+
+
+##
+##
+##
+def getCharKeyMap():
+    charKeyMap = {}
+    consts = prlsdkapi.prlsdk.consts
+
+    shift_left = consts.ScanCodesList['SHIFT_LEFT']
+
+    for i, c in enumerate("1234567890-=", 2):
+        charKeyMap[c] = {'code':(i,)}
+
+    for i, c in enumerate("!@#$%^&*()_+", 2):
+        charKeyMap[c] = {'code':(i,), 'modifier':shift_left}
+
+    for i, c in enumerate("qwertyuiop[]", 16):
+        charKeyMap[c] = {'code':(i,)}
+
+    for i, c in enumerate("QWERTYUIOP{}", 16):
+        charKeyMap[c] = {'code':(i,), 'modifier':shift_left}
+
+    for i, c in enumerate("asdfghjkl;'`", 30):
+        charKeyMap[c] = {'code':(i,)}
+
+    for i, c in enumerate('ASDFGHJKL:"~', 30):
+        charKeyMap[c] = {'code':(i,), 'modifier':shift_left}
+
+    for i, c in enumerate("\\zxcvbnm,./", 43):
+        charKeyMap[c] = {'code':(i,)}
+
+    for i, c in enumerate("|ZXCVBNM<>?", 43):
+        charKeyMap[c] = {'code':(i,), 'modifier':shift_left}
+
+    charKeyMap[' '] = {'code':(57,)}
+
+    return charKeyMap
+
+
+##
+##
+##
+def getCtrlKeyMap():
+    ctrlKeyMap = {}
+    consts = prlsdkapi.prlsdk.consts
+
+    for ctrl in [('<bs>','BACKSPACE'),
+                 ('<del>','DELETE'),
+                 ('<enter>','ENTER'),
+                 ('<return>','ENTER'),
+                 ('<esc>','ESC'),
+                 ('<f1>','F1'),
+                 ('<f2>','F2'),
+                 ('<f3>','F3'),
+                 ('<f4>','F4'),
+                 ('<f5>','F5'),
+                 ('<f6>','F6'),
+                 ('<f7>','F7'),
+                 ('<f8>','F8'),
+                 ('<f9>','F9'),
+                 ('<f10>','F10'),
+                 ('<f11>','F11'),
+                 ('<f12>','F12'),
+                 ('<tab>','TAB'),
+                 ('<up>','UP'),
+                 ('<down>','DOWN'),
+                 ('<left>','LEFT'),
+                 ('<right>','RIGHT'),
+                 ('<spacebar>','SPACE'),
+                 ('<insert>','INSERT'),
+                 ('<home>','HOME'),
+                 ('<end>','END'),
+                 ('<pageUp>','PAGE_UP'),
+                 ('<pageDown>','PAGE_DOWN')]:
+        ctrlKeyMap[ctrl[0]] = {'code':consts.ScanCodesList[ctrl[1]]}
+
+    return ctrlKeyMap
+
+
+##
+##
+##
+if __name__ == "__main__":
+    main()
+
+
+# Copyright (c) 2014, Jess Thrysoee
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without modification,
+# are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation and/or
+# other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+# ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
