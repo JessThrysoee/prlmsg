@@ -121,11 +121,11 @@ def send(message, vm, vm_io):
         modifier = 'modifier' in code and code['modifier']
 
         if modifier:
-            vm_io.send_key_event(vm, modifier, press, timeout)
-        vm_io.send_key_event(vm, c, press, timeout)
-        vm_io.send_key_event(vm, c, release, timeout)
+            vm_io.send_key_event_ex(vm, modifier, press, timeout)
+        vm_io.send_key_event_ex(vm, c, press, timeout)
+        vm_io.send_key_event_ex(vm, c, release, timeout)
         if modifier:
-            vm_io.send_key_event(vm, modifier, release, timeout)
+            vm_io.send_key_event_ex(vm, modifier, release, timeout)
 
 
 ##
@@ -135,33 +135,33 @@ def getCharKeyMap():
     charKeyMap = {}
     consts = prlsdkapi.prlsdk.consts
 
-    shift_left = consts.ScanCodesList['SHIFT_LEFT']
+    shift_left = consts.PRL_KEY_LEFT_SHIFT
 
-    for i, c in enumerate("1234567890-=", 2):
-        charKeyMap[c] = {'code':(i,)}
+    for i, c in enumerate("1234567890-=", 10):
+        charKeyMap[c] = {'code':i}
 
-    for i, c in enumerate("!@#$%^&*()_+", 2):
-        charKeyMap[c] = {'code':(i,), 'modifier':shift_left}
+    for i, c in enumerate("!@#$%^&*()_+", 10):
+        charKeyMap[c] = {'code':i, 'modifier':shift_left}
 
-    for i, c in enumerate("qwertyuiop[]", 16):
-        charKeyMap[c] = {'code':(i,)}
+    for i, c in enumerate("qwertyuiop[]", 24):
+        charKeyMap[c] = {'code':i}
 
-    for i, c in enumerate("QWERTYUIOP{}", 16):
-        charKeyMap[c] = {'code':(i,), 'modifier':shift_left}
+    for i, c in enumerate("QWERTYUIOP{}", 24):
+        charKeyMap[c] = {'code':i, 'modifier':shift_left}
 
-    for i, c in enumerate("asdfghjkl;'`", 30):
-        charKeyMap[c] = {'code':(i,)}
+    for i, c in enumerate("asdfghjkl;'`", 38):
+        charKeyMap[c] = {'code':i}
 
-    for i, c in enumerate('ASDFGHJKL:"~', 30):
-        charKeyMap[c] = {'code':(i,), 'modifier':shift_left}
+    for i, c in enumerate('ASDFGHJKL:"~', 38):
+        charKeyMap[c] = {'code':i, 'modifier':shift_left}
 
-    for i, c in enumerate("\\zxcvbnm,./", 43):
-        charKeyMap[c] = {'code':(i,)}
+    for i, c in enumerate("\\zxcvbnm,./", 51):
+        charKeyMap[c] = {'code':i}
 
-    for i, c in enumerate("|ZXCVBNM<>?", 43):
-        charKeyMap[c] = {'code':(i,), 'modifier':shift_left}
+    for i, c in enumerate("|ZXCVBNM<>?", 51):
+        charKeyMap[c] = {'code':i, 'modifier':shift_left}
 
-    charKeyMap[' '] = {'code':(57,)}
+    charKeyMap[' '] = {'code':consts.PRL_KEY_SPACE}
 
     return charKeyMap
 
@@ -171,37 +171,36 @@ def getCharKeyMap():
 ##
 def getCtrlKeyMap():
     ctrlKeyMap = {}
-    consts = prlsdkapi.prlsdk.consts
 
-    for ctrl in [('<bs>','BACKSPACE'),
-                 ('<del>','DELETE'),
+    for ctrl in [('<bs>', 'BACKSPACE'),
+                 ('<del>', 'DELETE'),
                  ('<enter>','ENTER'),
                  ('<return>','ENTER'),
-                 ('<esc>','ESC'),
-                 ('<f1>','F1'),
-                 ('<f2>','F2'),
-                 ('<f3>','F3'),
-                 ('<f4>','F4'),
-                 ('<f5>','F5'),
-                 ('<f6>','F6'),
-                 ('<f7>','F7'),
-                 ('<f8>','F8'),
-                 ('<f9>','F9'),
-                 ('<f10>','F10'),
-                 ('<f11>','F11'),
-                 ('<f12>','F12'),
-                 ('<tab>','TAB'),
-                 ('<up>','UP'),
-                 ('<down>','DOWN'),
-                 ('<left>','LEFT'),
-                 ('<right>','RIGHT'),
-                 ('<spacebar>','SPACE'),
-                 ('<insert>','INSERT'),
-                 ('<home>','HOME'),
-                 ('<end>','END'),
-                 ('<pageUp>','PAGE_UP'),
-                 ('<pageDown>','PAGE_DOWN')]:
-        ctrlKeyMap[ctrl[0]] = {'code':consts.ScanCodesList[ctrl[1]]}
+                 ('<esc>','ESCAPE'),
+                 ('<f1>', 'F1'),
+                 ('<f2>', 'F2'),
+                 ('<f3>', 'F3'),
+                 ('<f4>', 'F4'),
+                 ('<f5>', 'F5'),
+                 ('<f6>', 'F6'),
+                 ('<f7>', 'F7'),
+                 ('<f8>', 'F8'),
+                 ('<f9>', 'F9'),
+                 ('<f10>', 'F10'),
+                 ('<f11>', 'F11'),
+                 ('<f12>', 'F12'),
+                 ('<tab>', 'TAB'),
+                 ('<up>', 'UP'),
+                 ('<down>', 'DOWN'),
+                 ('<left>', 'LEFT'),
+                 ('<right>', 'RIGHT'),
+                 ('<spacebar>', 'SPACE'),
+                 ('<insert>', 'INSERT'),
+                 ('<home>', 'HOME'),
+                 ('<end>', 'END'),
+                 ('<pageUp>', 'PAGE_UP'),
+                 ('<pageDown>', 'PAGE_DOWN')]:
+        ctrlKeyMap[ctrl[0]] = {'code':getattr(prlsdkapi.prlsdk.consts, 'PRL_KEY_' + ctrl[1])}
 
     return ctrlKeyMap
 
